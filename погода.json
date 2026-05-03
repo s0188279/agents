@@ -1,0 +1,143 @@
+{
+  "name": "погода",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "f975fc34-015c-4ea6-b92c-fa4621642ae0",
+      "name": "В 8 утра",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "769907929",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "bf14709d-1517-4749-9116-e2756973cdf3",
+      "name": "Отправка в Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        112
+      ],
+      "webhookId": "b52916b4-08a8-4138-8f9c-7cb8695c7a20",
+      "credentials": {
+        "telegramApi": {
+          "id": "NXXuc9Eaw58SkX5I",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const hourly = $input.first().json.hourly;\n\nif (!hourly) {\n  return { text: \"Ошибка: почасовые данные не получены!\" };\n}\n\nconst weatherCodes = {\n  0: 'Ясно ☀️', 1: 'Почти ясно 🌤', 2: 'Облачно ⛅️', 3: 'Пасмурно ☁️', \n  45: 'Туман 🌫', 61: 'Дождь 🌧', 71: 'Снег ❄️', 80: 'Ливень 🌦'\n};\n\n// Функция для расчета данных за период\nfunction getPeriod(startHour, endHour) {\n  const temps = hourly.temperature_2m.slice(startHour, endHour + 1);\n  const precs = hourly.precipitation_probability.slice(startHour, endHour + 1);\n  const codes = hourly.weather_code.slice(startHour, endHour + 1);\n  \n  return {\n    min: Math.min(...temps),\n    max: Math.max(...temps),\n    prec: Math.max(...precs),\n    // Берем код погоды из середины интервала\n    condition: weatherCodes[codes[Math.floor(codes.length / 2)]] || 'Облачно ☁️'\n  };\n}\n\nconst morning = getPeriod(6, 11);\nconst day = getPeriod(12, 17);\nconst evening = getPeriod(18, 23);\n\nconst format = (name, d) => \n  `<b>${name}:</b>\\n🌡 ${d.min}°…${d.max}°C\\n☁️ ${d.condition}\\n☔️ Осадки: ${d.prec}%\\n`;\n\nlet message = `🗓 <b>Детальный прогноз на сегодня:</b>\\n\\n`;\nmessage += format(\"🌅 УТРО\", morning) + \"\\n\";\nmessage += format(\"☀️ ДЕНЬ\", day) + \"\\n\";\nmessage += format(\"🌇 ВЕЧЕР\", evening);\n\nreturn { text: message };"
+      },
+      "id": "defaa183-33a8-4d75-8896-8f81d2f7c0a4",
+      "name": "Текст сообщения",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        112
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.open-meteo.com/v1/forecast?latitude=55.75&longitude=37.62&hourly=temperature_2m,precipitation_probability,weather_code&timezone=auto&forecast_days=1",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "n8n-weather-bot"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "53379eeb-0f37-4ab7-a1bc-349a72ba23a0",
+      "name": "Запрос к api погоды",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        256,
+        112
+      ]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "В 8 утра": {
+      "main": [
+        [
+          {
+            "node": "Запрос к api погоды",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Текст сообщения": {
+      "main": [
+        [
+          {
+            "node": "Отправка в Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Запрос к api погоды": {
+      "main": [
+        [
+          {
+            "node": "Текст сообщения",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Europe/Moscow",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "cd8031d5-48a9-4eaf-b94b-f6226467362f",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40926073c642082a22e4e52d6e242bf12a3443049b7a99daabb4c0a534e4415a"
+  },
+  "id": "2PJUbFRfUqID863g",
+  "tags": []
+}
