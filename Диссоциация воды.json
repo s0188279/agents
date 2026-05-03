@@ -1,0 +1,204 @@
+{
+  "name": "Диссоциация воды",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "77f3a9d7-d4dd-46f4-ad8b-94020c02b42a",
+      "name": "В 8 утра",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -48,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ru&dt=t&&q={{ $json.entry.title }}",
+        "options": {}
+      },
+      "id": "b175c68b-6a9a-4d8c-8390-dc70f768fb13",
+      "name": "Перевод заголовка",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [
+        304,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// 1. Получаем данные напрямую из узла поиска\nconst searchData = $node[\"Поиск статей\"].json.data;\nconst translatedTitle = $node[\"Перевод заголовка\"].json;\n\n// 2. Вытаскиваем нужные поля регулярными выражениями (это сработает всегда)\nconst title = searchData.match(/<title>([\\s\\S]*?)<\\/title>/)?.[1] || \"Без названия\";\nconst abstract = searchData.match(/<summary>([\\s\\S]*?)<\\/summary>/)?.[1] || \"Нет описания\";\nconst link = searchData.match(/<id>([\\s\\S]*?)<\\/id>/)?.[1] || \"Нет ссылки\";\n\n// 3. Формируем чистый результат для Telegram и Groq\nreturn {\n  title_ru: translatedTitle?.[0]?.[0]?.[0] || title,\n  abstract: abstract.trim(),\n  url: link.trim(),\n  doi: link.split('/').pop()\n};"
+      },
+      "id": "40d5826e-0f66-4e97-8938-3a2295766122",
+      "name": "Очистка данных",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        -160
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "769907929",
+        "text": "=🧪 <b>ОТЧЕТ ПО ДИССОЦИАЦИИ</b>\n\n📄 <b>Статья:</b> {{ $node[\"Очистка данных\"].json.title_ru }}\n\n🤖 <b>Анализ ИИ:</b>\n{{ $node[\"Groq AI Анализ\"].json.choices[0].message.content }}\n\n🔗 <b>Ссылка:</b> {{ $node[\"Очистка данных\"].json.url }}\n🔗 <b>DOI:</b> {{ $node[\"Очистка данных\"].json.doi }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "634ec512-ff8e-4f35-be60-3c241e60c2dc",
+      "name": "Отправка в Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [
+        832,
+        -160
+      ],
+      "webhookId": "cdddb8c8-a7f6-4b72-a16d-615c3b041b9a",
+      "credentials": {
+        "telegramApi": {
+          "id": "DbmIzFNF1JGmTLGo",
+          "name": "Telegram account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://export.arxiv.org/api/query",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "search_query",
+              "value": "all:water dissociation"
+            },
+            {
+              "name": "start",
+              "value": "0"
+            },
+            {
+              "name": "max_results",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        128,
+        -160
+      ],
+      "id": "a5efade9-512b-41ef-8aef-1ec8f3886147",
+      "name": "Поиск статей"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer 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"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.3-70b-versatile\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"Проанализируй статью про электромембранные системы. Определи: теория или эксперимент. Сделай краткую выжимку (саморез) на русском (5-7 предложений). Название: {{ $json.title_ru }}. Аннотация: {{ $json.abstract }}\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        656,
+        -160
+      ],
+      "id": "5c6e712f-8fe4-48e7-ac0d-fbcfcc379f8c",
+      "name": "Groq AI Анализ"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "В 8 утра": {
+      "main": [
+        [
+          {
+            "node": "Поиск статей",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Перевод заголовка": {
+      "main": [
+        [
+          {
+            "node": "Очистка данных",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Очистка данных": {
+      "main": [
+        [
+          {
+            "node": "Groq AI Анализ",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Поиск статей": {
+      "main": [
+        [
+          {
+            "node": "Перевод заголовка",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Groq AI Анализ": {
+      "main": [
+        [
+          {
+            "node": "Отправка в Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "ccd8c076-1394-4ceb-b79a-c5c7862f4ee9",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "40926073c642082a22e4e52d6e242bf12a3443049b7a99daabb4c0a534e4415a"
+  },
+  "id": "NesOSM2gpKYe6IBt",
+  "tags": []
+}
